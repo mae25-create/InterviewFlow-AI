@@ -1,0 +1,8 @@
+{
+  "name": "InterviewFlow AI",
+  "description": "A high-fidelity interview recording app with real-time AI follow-up prompts to help you practice speaking naturally.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
