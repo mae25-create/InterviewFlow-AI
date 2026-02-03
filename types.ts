@@ -1,6 +1,8 @@
 
 export type VideoLayout = '9:16' | '16:9' | '3:4' | '1:1';
 
+export type InterviewMode = 'Quick Practice' | 'Full Mock Interview';
+
 export type InterviewTrack = 
   | 'Behavioral' 
   | 'Product/Strategy' 
@@ -13,6 +15,7 @@ export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 export interface Question {
   id: string;
   category: InterviewTrack;
+  difficulty: Difficulty;
   text: string;
 }
 
@@ -22,17 +25,24 @@ export interface AIPrompt {
   id: string;
 }
 
+export interface TimedTranscript {
+  text: string;
+  timestamp: number;
+}
+
 export interface RecordingSession {
   blob: Blob;
   url: string;
   startTime: number;
   duration: number;
   prompts: AIPrompt[];
-  transcript: string[]; // This stores chunks of recognized text
-  fullTranscript?: string; // Compiled text for AI analysis
+  transcript: string[]; 
+  timedTranscript: TimedTranscript[];
+  fullTranscript?: string;
   track: InterviewTrack;
   difficulty: Difficulty;
   aspectRatio: VideoLayout;
+  mode: InterviewMode;
   starterQuestion: string;
   feedback?: string;
 }
