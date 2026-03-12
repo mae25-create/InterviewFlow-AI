@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { RecordingSession, TimedTranscript } from '../types';
+import { RecordingSession } from '../types';
 import { LAYOUT_CONFIGS } from '../constants';
 
 interface PlaybackScreenProps {
@@ -23,12 +23,11 @@ const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ session: initialSession
   }, [initialSession]);
 
   useEffect(() => {
-    const timedTranscript = session.timedTranscript || [];
-    if (timedTranscript.length === 0) return;
+    if (session.timedTranscript.length === 0) return;
 
     let currentIdx = -1;
-    for (let i = 0; i < timedTranscript.length; i++) {
-      if (currentTime >= timedTranscript[i].timestamp) {
+    for (let i = 0; i < session.timedTranscript.length; i++) {
+      if (currentTime >= session.timedTranscript[i].timestamp) {
         currentIdx = i;
       } else {
         break;
@@ -253,32 +252,44 @@ const PlaybackScreen: React.FC<PlaybackScreenProps> = ({ session: initialSession
             ref={transcriptContainerRef}
             className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2"
           >
-            {session.timedTranscript && session.timedTranscript.length > 0 ? (
-              <div className="flex flex-col gap-4">
-                {session.timedTranscript.map((chunk, i) => (
-                  <div
+            {session.timedTranscript.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {session.timedTranscript.map((sentence, i) => (
+                  <button
                     key={i}
                     data-index={i}
-                    onClick={() => seekTo(chunk.timestamp)}
-                    className={`cursor-pointer transition-all duration-300 p-4 rounded-2xl group ${
+                    onClick={() => seekTo(sentence.timestamp)}
+                    className={`w-full text-left transition-all duration-300 p-5 rounded-[2rem] border-2 group relative overflow-hidden ${
                       activeIndex === i 
-                        ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20 translate-x-2' 
-                        : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                        ? 'bg-indigo-600 border-indigo-400 text-white shadow-2xl shadow-indigo-500/30 translate-x-2' 
+                        : 'bg-slate-900/50 border-slate-800/50 text-slate-400 hover:border-slate-700 hover:bg-slate-800/50'
                     }`}
                   >
-                    <div className="flex justify-between items-center mb-1">
-                       <span className={`text-[9px] font-black uppercase ${activeIndex === i ? 'text-indigo-200' : 'text-slate-500'}`}>
-                         T+{Math.floor(chunk.timestamp)}s
-                       </span>
+                    <div className="flex justify-between items-center mb-2 relative z-10">
+                       <div className="flex items-center gap-2">
+                         <div className={`w-1.5 h-1.5 rounded-full ${activeIndex === i ? 'bg-indigo-200 animate-pulse' : 'bg-indigo-500/50'}`} />
+                         <span className={`text-[10px] font-black uppercase tracking-widest ${activeIndex === i ? 'text-indigo-100' : 'text-slate-500'}`}>
+                           {Math.floor(sentence.timestamp / 60)}:{(sentence.timestamp % 60).toFixed(0).padStart(2, '0')}
+                         </span>
+                       </div>
+                       <div className={`opacity-0 group-hover:opacity-100 transition-opacity ${activeIndex === i ? 'text-indigo-200' : 'text-slate-500'}`}>
+                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                       </div>
                     </div>
-                    <p className={`text-sm font-bold ${activeIndex === i ? 'text-white' : 'text-slate-300'}`}>
-                      {chunk.text}
+                    <p className={`text-sm font-bold leading-relaxed relative z-10 ${activeIndex === i ? 'text-white' : 'text-slate-300'}`}>
+                      {sentence.text}
                     </p>
-                  </div>
+                    {activeIndex === i && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-transparent pointer-events-none" />
+                    )}
+                  </button>
                 ))}
               </div>
             ) : (
-              <p className="text-slate-500 italic text-center py-20 font-bold uppercase tracking-widest text-[10px]">No log found</p>
+              <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-4"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <p className="italic font-bold uppercase tracking-widest text-[10px]">No log found</p>
+              </div>
             )}
           </div>
           <p className="mt-6 text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] text-center">Click log entry to seek</p>

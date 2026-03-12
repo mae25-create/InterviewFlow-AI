@@ -36,9 +36,8 @@ export interface RecordingSession {
   startTime: number;
   duration: number;
   prompts: AIPrompt[];
-  transcript: string[]; 
-  timedTranscript: TimedTranscript[];
-  fullTranscript?: string;
+  timedTranscript: TimedTranscript[]; // Timestamped chunks for playback highlighting
+  fullTranscript?: string; // Compiled text for AI analysis
   track: InterviewTrack;
   difficulty: Difficulty;
   aspectRatio: VideoLayout;

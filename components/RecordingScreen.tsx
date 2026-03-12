@@ -60,6 +60,7 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [activePrompt, setActivePrompt] = useState<AIPrompt | null>(null);
   const [transcriptSnippets, setTranscriptSnippets] = useState<string[]>([]);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [aiIsSpeaking, setAiIsSpeaking] = useState(false);
 
   const recordingActiveRef = useRef(false);
@@ -127,6 +128,7 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
       return;
     }
 
+    setIsConnecting(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
@@ -135,9 +137,10 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
       outputNodeRef.current.connect(outputAudioContextRef.current.destination);
 
       const sessionPromise = ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks: {
           onopen: () => {
+            setIsConnecting(false);
             const source = inputAudioContextRef.current!.createMediaStreamSource(streamRef.current!);
             const scriptProcessor = inputAudioContextRef.current!.createScriptProcessor(4096, 1, 1);
             scriptProcessor.onaudioprocess = (e) => {
@@ -159,7 +162,11 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
 
             if (mode === 'Full Mock Interview') {
                sessionPromise.then(s => s.sendRealtimeInput({ 
-                 text: `Start the interview for a ${track} position at ${difficulty} difficulty. Greet me and ask: ${starterQuestion.text}` 
+                 text: `You are the interviewer. Start the session now. Greet the candidate and then ask the first question: ${starterQuestion.text}` 
+               }));
+            } else {
+               sessionPromise.then(s => s.sendRealtimeInput({ 
+                 text: `I am practicing for an interview. I will answer this question: ${starterQuestion.text}. Please listen and then provide a natural, conversational follow-up.` 
                }));
             }
           },
@@ -190,7 +197,7 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
 
             if (message.serverContent?.outputTranscription) {
               const text = message.serverContent.outputTranscription.text;
-              if (text && text.trim().endsWith('?')) {
+              if (text) {
                 const newPrompt: AIPrompt = {
                   id: Math.random().toString(36).substr(2, 9),
                   text: text.trim(),
@@ -198,7 +205,9 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
                 };
                 setActivePrompt(newPrompt);
                 promptsHistoryRef.current.push(newPrompt);
-                setTimeout(() => setActivePrompt(curr => curr?.id === newPrompt.id ? null : curr), 10000);
+                // Keep the prompt visible for a while if it's a question
+                const displayTime = text.includes('?') ? 12000 : 6000;
+                setTimeout(() => setActivePrompt(curr => curr?.id === newPrompt.id ? null : curr), displayTime);
               }
             }
             
@@ -233,11 +242,30 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
           outputAudioTranscription: {},
           inputAudioTranscription: {},
-          systemInstruction: `You are a professional hiring manager for a ${track} role. 
-          The complexity of this interview is ${difficulty}.
-          Mode: ${mode === 'Full Mock Interview' ? 'Active Conversation' : 'Follow-up Only'}.
-          Adjust your follow-up questions to match the ${difficulty} difficulty level. 
-          Be professional, rigorous but fair.`
+          systemInstruction: `You are "Alex," a highly experienced and charismatic Senior Hiring Manager at a top-tier global firm. 
+          Your goal is to conduct a natural, engaging, and high-stakes interview for a ${track} role at ${difficulty} difficulty.
+
+          Persona Traits:
+          - **Professional yet Human**: You aren't a robot. You use conversational fillers like "Hmm," "Got it," "That's interesting," or "I see where you're coming from."
+          - **Active Listener**: You react to specific details the candidate mentions. If they mention a specific challenge, acknowledge it before moving to your next question.
+          - **Rigorous but Encouraging**: You want the candidate to succeed, but you need to test their limits. At ${difficulty} difficulty, your follow-ups should be ${difficulty === 'Hard' ? 'extremely challenging and deep' : difficulty === 'Medium' ? 'thought-provoking' : 'straightforward but insightful'}.
+          - **Dynamic Pacing**: Don't just fire questions. If the candidate gives a long, detailed answer, take a moment to digest it verbally ("That was a very thorough explanation, thank you").
+
+          Interview Flow:
+          ${mode === 'Full Mock Interview' 
+            ? `1. **Introduction**: Greet the candidate warmly. Set the stage.
+               2. **The Lead**: You are in charge. Ask the first question: "${starterQuestion.text}".
+               3. **The Deep Dive**: Listen to their answer. Provide brief, natural feedback. Then, ask a follow-up that digs into the "why" or "how" of their response.
+               4. **The Conversation**: Keep it flowing like a real talk. If they ask you a question, answer it briefly and pivot back to the interview.`
+            : `1. **The Focus**: The user is practicing a specific question: "${starterQuestion.text}".
+               2. **The Critique**: Listen to their answer. Provide a brief, encouraging comment on their delivery or content.
+               3. **The Challenge**: Ask one or two sharp follow-up questions to see how they handle pressure on this specific topic.`
+          }
+
+          Constraints:
+          - **Be Concise**: Keep your turns under 30 seconds.
+          - **Audio Only**: Your primary output is your voice.
+          - **No Meta-Talk**: Don't say "As an AI..." or "I am processing your input." Just be Alex.`
         }
       });
 
@@ -275,7 +303,7 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
       onFinished({
         blob, url, startTime: startTimeRef.current, duration: timerValueRef.current,
         prompts: [...promptsHistoryRef.current], timedTranscript: [...timedTranscriptRef.current],
-        transcript: [], fullTranscript: fullTranscriptRef.current.trim(),
+        fullTranscript: fullTranscriptRef.current.trim(),
         track, difficulty, aspectRatio: layout, mode, starterQuestion: starterQuestion.text
       });
     };
@@ -392,8 +420,17 @@ const RecordingScreen: React.FC<RecordingScreenProps> = ({
               disabled={!isCameraReady}
               className="px-14 py-4 bg-red-600 hover:bg-red-500 text-white rounded-3xl font-black shadow-2xl shadow-red-600/20 transition-all disabled:opacity-50 flex items-center gap-3 text-lg"
             >
-              <div className="w-4 h-4 bg-white rounded-full" />
-              Start Recording
+              {isConnecting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Connecting AI...
+                </>
+              ) : (
+                <>
+                  <div className="w-4 h-4 bg-white rounded-full" />
+                  {mode === 'Full Mock Interview' ? 'Start Mock Interview' : 'Start Recording'}
+                </>
+              )}
             </button>
           </>
         ) : (
